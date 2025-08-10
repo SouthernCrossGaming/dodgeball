@@ -4,7 +4,7 @@
 #define _tf2dodgeball_included
 
 //Maximum values
-#define MAXROCKETS 100
+#define MAXROCKETS 30
 #define ROCKETCLASSNUM 26
 #define MAXROCKETCLASS 25
 #define DEF_C 25
@@ -113,6 +113,7 @@ methodmap RocketEnt
 //Rocket Classes//
 char g_class_name[ROCKETCLASSNUM][MAX_NAME_LENGTH];
 char g_class_trail[ROCKETCLASSNUM][PLATFORM_MAX_PATH];
+char g_class_sprite[ROCKETCLASSNUM][PLATFORM_MAX_PATH];
 char g_class_model[ROCKETCLASSNUM][PLATFORM_MAX_PATH];
 bool g_class_animated[ROCKETCLASSNUM];
 float g_class_size[ROCKETCLASSNUM];
@@ -130,6 +131,10 @@ float g_class_deflect_delay[ROCKETCLASSNUM];
 bool g_class_target_closest[ROCKETCLASSNUM];
 bool g_class_aimed_allow[ROCKETCLASSNUM];
 float g_class_aimed_speed[ROCKETCLASSNUM];
+int g_class_swarm_mult[ROCKETCLASSNUM];
+float g_class_hitboxX[ROCKETCLASSNUM];
+float g_class_hitboxY[ROCKETCLASSNUM];
+float g_class_hitboxZ[ROCKETCLASSNUM];
 int g_class_bounce_max[ROCKETCLASSNUM];
 float g_class_bounce_delay[ROCKETCLASSNUM];
 bool g_class_bounce_keep[ROCKETCLASSNUM];
@@ -155,6 +160,7 @@ bool g_class_explosion_create[ROCKETCLASSNUM];
 float g_class_explosion_damage[ROCKETCLASSNUM];
 float g_class_explosion_push_strength[ROCKETCLASSNUM];
 float g_class_explosion_radius[ROCKETCLASSNUM];
+float g_class_explosion_radiusinc[ROCKETCLASSNUM];
 float  g_class_explosion_fallof_radius[ROCKETCLASSNUM];
 char g_class_explosion_sound[ROCKETCLASSNUM][PLATFORM_MAX_PATH];
 
@@ -170,22 +176,25 @@ methodmap RocketClass
 	{
 		public get() { return view_as<int>( this ); }
 	}
-	
+
 	public void GetName(char [] name, int length) { strcopy(name, length, g_class_name[this.index]); }
 	public void SetName(char [] name) { strcopy(g_class_name[this.index], MAX_NAME_LENGTH, name); }
-	
+
+	public void GetSprite(char [] sprite, int length) { strcopy(sprite, length, g_class_sprite[this.index]); }
+	public void SetSprite(char [] sprite) { strcopy(g_class_sprite[this.index], PLATFORM_MAX_PATH, sprite); }
+
 	public void GetTrail(char [] trail, int length) { strcopy(trail, length, g_class_trail[this.index]); }
 	public void SetTrail(char [] trail) { strcopy(g_class_trail[this.index], PLATFORM_MAX_PATH, trail); }
-	
+
 	public void GetModel(char [] model, int length) { strcopy(model, length, g_class_model[this.index]); }
 	public void SetModel(char [] model) { strcopy(g_class_model[this.index], PLATFORM_MAX_PATH, model); }
-	
+
 	property bool animated
 	{
 		public get() { return g_class_animated[ this.index ]; }
 		public set( bool tClosest ) { g_class_animated[ this.index ] = tClosest; }
 	}
-	
+
 	property float size
 	{
 		public get() { return g_class_size[ this.index ]; }
@@ -196,7 +205,7 @@ methodmap RocketClass
 		public get() { return g_class_size_inc[ this.index ]; }
 		public set( float fsizeinc ) { g_class_size_inc[ this.index ] = fsizeinc; }
 	}
-	
+
 	property float damage
 	{
 		public get() { return g_class_damage[ this.index ]; }
@@ -207,7 +216,7 @@ methodmap RocketClass
 		public get() { return g_class_damage_inc[ this.index ]; }
 		public set( float fdamageinc ) { g_class_damage_inc[ this.index ] = fdamageinc; }
 	}
-	
+
 	property float speed
 	{
 		public get() { return g_class_speed[ this.index ]; }
@@ -218,7 +227,7 @@ methodmap RocketClass
 		public get() { return g_class_speed_inc[ this.index ]; }
 		public set( float fspeedinc ) { g_class_speed_inc[ this.index ] = fspeedinc; }
 	}
-	
+
 	property float turnrate
 	{
 		public get() { return g_class_turnrate[ this.index ]; }
@@ -264,6 +273,11 @@ methodmap RocketClass
 		public get() { return g_class_aimed_speed[ this.index ]; }
 		public set( float faimedspeed ) { g_class_aimed_speed[ this.index ] = faimedspeed; }
 	}
+	property int spawnmult
+	{
+		public get() { return g_class_swarm_mult[ this.index ]; }
+		public set( int spawnmult ) { g_class_swarm_mult[ this.index ] = spawnmult; }
+	}
 	property int maxbounce
 	{
 		public get() { return g_class_bounce_max[ this.index ]; }
@@ -274,12 +288,27 @@ methodmap RocketClass
 		public get() { return g_class_bounce_delay[ this.index ]; }
 		public set( float delay ) { g_class_bounce_delay[ this.index ] = delay; }
 	}
+	property float hitboxX
+	{
+		public get() { return g_class_hitboxX[ this.index ]; }
+		public set( float hitbox ) { g_class_hitboxX[ this.index ] = hitbox; }
+	}
+	property float hitboxY
+	{
+		public get() { return g_class_hitboxY[ this.index ]; }
+		public set( float hitbox ) { g_class_hitboxY[ this.index ] = hitbox; }
+	}
+	property float hitboxZ
+	{
+		public get() { return g_class_hitboxZ[ this.index ]; }
+		public set( float hitbox ) { g_class_hitboxZ[ this.index ] = hitbox; }
+	}
 	property bool bouncekeepdir
 	{
 		public get() { return g_class_bounce_keep[ this.index ]; }
 		public set( bool allow ) { g_class_bounce_keep[ this.index ] = allow; }
 	}
-	
+
 	//Sounds
 	property bool snd_spawn_use
 	{
@@ -288,7 +317,7 @@ methodmap RocketClass
 	}
 	public void GetSndSpawn(char [] sound, int length) { strcopy(sound, length, g_class_sound_spawn[this.index]); }
 	public void SetSndSpawn(char [] sound) { strcopy(g_class_sound_spawn[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	property bool snd_alert_use
 	{
 		public get() { return g_class_sound_alert_play[ this.index ]; }
@@ -296,7 +325,7 @@ methodmap RocketClass
 	}
 	public void GetSndAlert(char [] sound, int length) { strcopy(sound, length, g_class_sound_alert[this.index]); }
 	public void SetSndAlert(char [] sound) { strcopy(g_class_sound_alert[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	property bool snd_deflect_use
 	{
 		public get() { return g_class_sound_deflect_play[ this.index ]; }
@@ -304,10 +333,10 @@ methodmap RocketClass
 	}
 	public void GetSndDeflectBlue(char [] sound, int length) { strcopy(sound, length, g_class_sound_deflect_red[this.index]); }
 	public void SetSndDeflectBlue(char [] sound) { strcopy(g_class_sound_deflect_red[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	public void GetSndDeflectRed(char [] sound, int length) { strcopy(sound, length, g_class_sound_deflect_blue[this.index]); }
 	public void SetSndDeflectRed(char [] sound) { strcopy(g_class_sound_deflect_blue[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	property bool snd_beep_use
 	{
 		public get() { return g_class_sound_beep_play[ this.index ]; }
@@ -320,7 +349,7 @@ methodmap RocketClass
 		public get() { return g_class_sound_beep_interval[ this.index ]; }
 		public set( float delay ) { g_class_sound_beep_interval[ this.index ] = delay; }
 	}
-	
+
 	property bool snd_aimed_use
 	{
 		public get() { return g_class_sound_aimed_play[ this.index ]; }
@@ -328,13 +357,13 @@ methodmap RocketClass
 	}
 	public void GetSndAimed(char [] sound, int length) { strcopy(sound, length, g_class_sound_aimed[this.index]); }
 	public void SetSndAimed(char [] sound) { strcopy(g_class_sound_aimed[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	public void GetSndAimedTarget(char [] sound, int length) { strcopy(sound, length, g_class_sound_aimed_target[this.index]); }
 	public void SetSndAimedTarget(char [] sound) { strcopy(g_class_sound_aimed_target[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	public void GetSndAimedOwner(char [] sound, int length) { strcopy(sound, length, g_class_sound_aimed_owner[this.index]); }
 	public void SetSndAimedOwner(char [] sound) { strcopy(g_class_sound_aimed_owner[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	property bool snd_bounce_use
 	{
 		public get() { return g_class_sound_bounce_play[ this.index ]; }
@@ -342,7 +371,7 @@ methodmap RocketClass
 	}
 	public void GetSndBounce(char [] sound, int length) { strcopy(sound, length, g_class_sound_bounce[this.index]); }
 	public void SetSndBounce(char [] sound) { strcopy(g_class_sound_bounce[this.index], PLATFORM_MAX_PATH, sound); }
-	
+
 	//Explosion
 	property bool exp_use
 	{
@@ -364,6 +393,11 @@ methodmap RocketClass
 		public get() { return g_class_explosion_radius[ this.index ]; }
 		public set( float ent ) { g_class_explosion_radius[ this.index ] = ent; }
 	}
+	property float exp_radiusinc
+	{
+		public get() { return g_class_explosion_radiusinc[ this.index ]; }
+		public set( float ent ) { g_class_explosion_radiusinc[ this.index ] = ent; }
+	}
 	property float exp_fallof
 	{
 		public get() { return g_class_explosion_fallof_radius[ this.index ]; }
@@ -372,5 +406,5 @@ methodmap RocketClass
 	public void GetExpSound(char [] sound, int length) { strcopy(sound, length, g_class_explosion_sound[this.index]); }
 	public void SetExpSound(char [] sound) { strcopy(g_class_explosion_sound[this.index], PLATFORM_MAX_PATH, sound); }
 
-	
+
 }
