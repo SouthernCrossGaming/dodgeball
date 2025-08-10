@@ -135,6 +135,7 @@ StringMap g_CommandToBlock;
 StringMap g_BlockOnlyOnPreparation;
 
 //Spawner
+bool g_plugin_spawning;
 int g_max_rockets;
 bool g_limit_rockets;
 float g_spawn_delay;
@@ -177,6 +178,7 @@ public void OnPluginStart()
     RegAdminCmd("sm_1v1", Command_1v1, ADMFLAG_ROOT,"Enables 1v1 for the rest of the map.");
     RegAdminCmd("sm_no1v1", Command_no1v1, ADMFLAG_ROOT,"Disables 1v1 for the rest of the map.");
     RegAdminCmd("sm_reloaddb", Command_ReloadConfig, ADMFLAG_ROOT ,"Reload the dodgeball's configs on round end.");
+    RegAdminCmd("sm_spawnrocket", Command_SpawnRocket, ADMFLAG_ROOT ,"Manually fires a rocket.");
 
     //Creation of Tries
     g_1v1_Music = CreateTrie();
@@ -222,9 +224,37 @@ public void OnPluginStart()
     HookEvent("teamplay_round_win", OnRoundEnd);
     HookEvent("teamplay_round_stalemate", OnRoundEnd);
 
+    HookEntityOutput("logic_relay", "OnUser1", OutputHook);
+
     //Constant file paths
     BuildPath(Path_SM, g_mainfile, PLATFORM_MAX_PATH, "configs/dodgeball_redux/dodgeball.cfg");
     BuildPath(Path_SM, g_rocketclasses, PLATFORM_MAX_PATH, "configs/dodgeball_redux/rocketclasses.cfg");
+}
+
+public Action OutputHook(const char[] name, int caller, int activator, float delay)
+{
+    //THIS IS NOT DONE YET
+    //WAIT FOR FELICITY
+    if(!g_isDBmap)
+    {
+        return Plugin_Continue;
+    }
+
+    char callerClassname[64];
+    if (IsValidEntity(caller))
+    {
+        GetEntityClassname(caller, callerClassname, sizeof(callerClassname));
+    }
+
+    char activatorClassname[64];
+    if (IsValidEntity(activator))
+    {
+        GetEntityClassname(activator, activatorClassname, sizeof(activatorClassname));
+    }
+
+    LogMessage("[ENTOUTPUT] %s (caller: %d/%s, activator: %d/%s)", name, caller, callerClassname, activator, activatorClassname);
+
+    return Plugin_Continue;
 }
 
 /* OnMapStart()
@@ -273,6 +303,29 @@ public void OnMapEnd()
         g_RocketEnt[i].entity = INVALID_ENT_REFERENCE;
     }
     ResetCvars();
+}
+
+public Action Command_SpawnRocket(int client,int args)
+{
+    char arg[128];
+    char full[256];
+ 
+    GetCmdArgString(full, sizeof(full));
+
+    PrintToServer("Argument string: %s", full);
+    PrintToServer("Argument count: %d", args);
+
+    for (int i = 1; i <= args; i++)
+    {
+        GetCmdArg(i, arg, sizeof(arg));
+        PrintToServer("Argument %d: %s", i, arg);
+    }
+    
+    //SpawnRocket(class, rocketTeam, fPosition, fAngles, false);
+    
+    //g_reloadConfig = true;
+    ReplyToCommand(client,"[DB] Rocket fire test");
+    return Plugin_Continue;
 }
 
 public Action Command_ReloadConfig(client,args)
@@ -595,15 +648,16 @@ void LoadConfigs()
     g_prefer_hint = !!kv.GetNum("preferhint",1);
     kv.GetString("servername",g_server_name,PLATFORM_MAX_PATH,"The Server");
     //Spawner limits and chances
-    if(kv.JumpToKey("spawner"))
+    if (kv.JumpToKey("spawner"))
     {
+        g_plugin_spawning = !!kv.GetNum("PluginSpawning", 1);
         g_max_rockets = kv.GetNum("MaxRockets", 2);
-        g_limit_rockets = !!kv.GetNum("LimitRockets",1);
-        g_spawn_delay = kv.GetFloat("SpawnDelay",2.0);
+        g_limit_rockets = !!kv.GetNum("LimitRockets", 1);
+        g_spawn_delay = kv.GetFloat("SpawnDelay", 2.0);
         if(kv.JumpToKey("chances"))
         {
             char rocketname[MAX_NAME_LENGTH];
-            for(int i = 0; i < g_RocketClass_count; i++)
+            for (int i = 0; i < g_RocketClass_count; i++)
             {
                 g_RocketClass[i].GetName(rocketname,MAX_NAME_LENGTH);
                 g_class_chance.SetValue(rocketname, kv.GetNum(rocketname,0));
@@ -1100,11 +1154,12 @@ public Action OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
     {
         return Plugin_Continue;
     }
+
     SearchSpawns();
     //RenderHud();
-    for(int i = 1; i <= MaxClients; i++)
+    for (int i = 1; i <= MaxClients; i++)
     {
-        if(IsValidAliveClient(i))
+        if (IsValidAliveClient(i))
         {
             SetEntityMoveType(i, MOVETYPE_WALK);
         }
@@ -1113,9 +1168,9 @@ public Action OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
     g_roundActive = true;
     // g_canSpawn = true;
 
-    if(g_1v1_allow)
+    if (g_1v1_allow)
     {
-        if( GetAlivePlayersCount(TEAM_BLUE,-1) == 1 && GetAlivePlayersCount(TEAM_RED,-1) == 1)
+        if (GetAlivePlayersCount(TEAM_BLUE,-1) == 1 && GetAlivePlayersCount(TEAM_RED,-1) == 1)
         {
             Start1V1Mode();
         }
@@ -1123,24 +1178,27 @@ public Action OnRoundStart(Handle event, const char[] name, bool dontBroadcast)
 
     //Rocket's limit
     g_max_rockets_dynamic = g_max_rockets;
-    if(g_limit_rockets)
+    if (g_limit_rockets)
     {
         //Here we get the alive player count for each team and we set the maxium rockets to the lower number.
         int AliveCount = GetAlivePlayersCount(TEAM_RED,-1);
-        if(g_max_rockets_dynamic > AliveCount)
+        if (g_max_rockets_dynamic > AliveCount)
         {
             g_max_rockets_dynamic = AliveCount;
         }
 
         AliveCount = GetAlivePlayersCount(TEAM_BLUE,-1);
-        if(g_max_rockets_dynamic > AliveCount)
+        if (g_max_rockets_dynamic > AliveCount)
         {
             g_max_rockets_dynamic = AliveCount;
         }
     }
 
     g_lastSpawned = GetRandomInt(TEAM_RED,TEAM_BLUE);
-    FireRocket();
+
+    //ROWDY
+    //This will probably need to be refactored
+    if (g_plugin_spawning) FireRocket();
 
     return Plugin_Continue;
 }
@@ -2401,7 +2459,7 @@ int SpawnRocket(int class, int rocketTeam, float fPosition[3], float fAngles[3],
         g_lastSpawned = rocketTeam;
         // g_canSpawn = false;z
         // RenderHud();
-        CreateTimer(g_spawn_delay, TryFireRocket);
+        if (g_plugin_spawning) CreateTimer(g_spawn_delay, TryFireRocket);
     }
 
     return rIndex;
